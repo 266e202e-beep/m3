@@ -26,7 +26,13 @@ Q2 = [f'Q2_{i}' for i in range(1, 6)]
 d['Q1平均'] = d[Q1].mean(axis=1)
 
 
+NAMES = {'1': '効果発現速度', '2': '適用症状の広さ', '3': '副作用の少なさ', '4': '他の薬との飲み合わせの良さ', '5': '24h持続性'}
+NM = {f'Q{q}_{i}': f'Q{q}_{i} {NAMES[str(i)]}' for q in (1, 2) for i in range(1, 6)}
+FN = {k: k.split(' ')[0] + '\n' + v.split(' ')[1].replace('飲み合わせ', '\n飲み合わせ') for k, v in NM.items()}
+
+
 def save(df, name):
+    df = df.rename(index=NM, columns=NM)
     df.to_csv(os.path.join(OUT, name), encoding='utf-8-sig')
 
 
@@ -77,7 +83,7 @@ for i in range(len(DEPTS)):
     ax.text(i, pres.iloc[i] + unp.iloc[i] / 2, f'{unp.iloc[i]:.1f}', ha='center', va='center', color=INK, fontsize=10)
     ax.text(i, pres.iloc[i] + unp.iloc[i] + .15, f'計 {pres.iloc[i] + unp.iloc[i]:.1f}', ha='center', color=INK2, fontsize=9)
 ax.set_xticks(x); ax.set_xticklabels(DEPTS, color=INK)
-ax.set_ylabel('医師一人当たり花粉症患者数(期間不明)', color=INK2)
+ax.set_ylabel('医師一人当たり花粉症患者数(直近1年間)', color=INK2)
 ax.set_ylim(0, 14)
 ax.set_title('診療科別 医師一人当たり患者数の内訳', loc='left', color=INK, fontsize=12)
 ax.legend(frameon=False, loc='upper right', fontsize=9, labelcolor=INK2)
@@ -164,7 +170,7 @@ ax.bar(qs, un, .6, bottom=pr, color=ORANGE, label='潜在未処方患者')
 for q in qs:
     ax.text(q, pr[q] + un[q] + .15, f'未処方 {un[q]:.1f}', ha='center', color=INK, fontsize=9)
 ax.set_xticks(qs); ax.set_xticklabels(qs, color=INK)
-ax.set_xlabel('処方意向 Q4(1〜5段階)', color=INK2); ax.set_ylabel('医師一人当たり患者数(期間不明)', color=INK2)
+ax.set_xlabel('処方意向 Q4(1〜5段階)', color=INK2); ax.set_ylabel('医師一人当たり患者数(直近1年間)', color=INK2)
 ax.set_ylim(0, 11.5); ax.legend(frameon=False, loc='upper left', fontsize=9, labelcolor=INK2)
 ax.set_title('処方意向別 医師一人当たり患者数の内訳', loc='left', color=INK, fontsize=12)
 f.tight_layout(); f.savefig(os.path.join(OUT, 'fig2_処方意向別の処方状況.png'), dpi=150, facecolor=SURF); plt.close(f)
@@ -225,7 +231,7 @@ im = ax.imshow(H.values, cmap=SEQ, vmin=1.5, vmax=3.5, aspect='auto')
 for i in range(H.shape[0]):
     for j in range(H.shape[1]):
         ax.text(j, i, f'{H.values[i, j]:.2f}', ha='center', va='center', color='white' if H.values[i, j] > 2.9 else INK, fontsize=10)
-ax.set_xticks(range(6)); ax.set_xticklabels(Q1 + ['5項目\n平均'], color=INK, fontsize=9)
+ax.set_xticks(range(6)); ax.set_xticklabels([FN[c] for c in Q1] + ['5項目\n平均'], color=INK, fontsize=7.5)
 ax.set_yticks(range(5)); ax.set_yticklabels(DEPTS + ['全体'], color=INK)
 for s in ax.spines.values(): s.set_visible(False)
 ax.tick_params(length=0)
@@ -282,7 +288,7 @@ for yy, a, b, c in zip(y, t4a['順位付けした割合'], t4a['2位以内の割
     ax.text(a * 100 + 1, yy + h, f'{a*100:.0f}%', va='center', color=INK, fontsize=9)
     ax.text(b * 100 + 1, yy, f'{b*100:.0f}%', va='center', color=INK, fontsize=9)
     ax.text(c * 100 + 1, yy - h, f'{c*100:.0f}%', va='center', color=INK, fontsize=9)
-ax.set_yticks(y); ax.set_yticklabels(Q2, color=INK); ax.set_xlim(0, 80)
+ax.set_yticks(y); ax.set_yticklabels([FN[c] for c in Q2], color=INK, fontsize=9); ax.set_xlim(0, 80)
 ax.set_xlabel('回答者5,000名に占める割合(%)', color=INK2)
 ax.legend(frameon=False, fontsize=9, labelcolor=INK2, loc='lower right')
 ax.set_title('Q2 項目別の選択率と上位率', loc='left', color=INK, fontsize=12)
@@ -292,7 +298,7 @@ ax.imshow(H, cmap=SEQ, vmin=0, vmax=60, aspect='auto')
 for i in range(H.shape[0]):
     for j in range(H.shape[1]):
         ax.text(j, i, f'{H[i, j]:.0f}%', ha='center', va='center', color='white' if H[i, j] > 33 else INK, fontsize=10)
-ax.set_xticks(range(5)); ax.set_xticklabels(Q2, color=INK, fontsize=9)
+ax.set_xticks(range(5)); ax.set_xticklabels([FN[c] for c in Q2], color=INK, fontsize=7.5)
 ax.set_yticks(range(5)); ax.set_yticklabels(DEPTS + ['全体'], color=INK)
 for s in ax.spines.values(): s.set_visible(False)
 ax.tick_params(length=0)
