@@ -5,6 +5,7 @@
 費用 = 既読件数 × 400円(MR君は既読1件ごとの課金)
 既読医師率(f回) = 1 −(1 − 10回配信時の既読医師率)^(f/10)   (配信ごとの読まれやすさが一定と仮定)
 追加処方患者 = 既読医師の増減 × 1人あたり潜在未処方 × 翌年比(平均への回帰の補正) × 増分転換率(シナリオの仮定)
+全国換算 = 回答医師の結果 × (市場全体の医師数31万人 ÷ 回答医師5,000名)。追加売上 = 全国の追加処方患者 × 1人あたり年間売上(50億円 ÷ 全国の処方患者推計)
 配信を減らす群(③潜在0〜2人)で失う効果も、同じ転換率で差し引く。施策②(コンテンツの最適化)の上乗せは含めない。
 """
 import os, json
@@ -12,7 +13,9 @@ import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__)); OUT = os.path.join(HERE, 'output')
 P = json.load(open(os.path.join(OUT, 'params_v5.json')))
-SALES_PER_PT = P['売上'] * 1.0 / (P['回答者_処方患者'] * P['全医師'] / P['回答医師'])   # 50億円 ÷ 全医師の処方患者推計
+N_MARKET = 310000                     # 市場全体の医師数 = m3.com登録医師(M3会社資料「約90%(31万人以上)が登録」)
+SCALE = N_MARKET / P['回答医師']          # 全国換算の倍率(回答医師5,000名が市場全体と同じ構成と仮定)
+SALES_PER_PT = P['売上'] * 1.0 / (P['回答者_処方患者'] * SCALE)   # 50億円 ÷ 全国の処方患者推計(回答医師の処方患者 × 倍率)
 CONV = {'保守': 0.01, '基準': 0.03, '楽観': 0.06}
 UNIT = P['既読単価']; PROD_COST = 0; OPS_COST = 0
 
@@ -46,10 +49,15 @@ for sc in ['現状', 'A案', 'B案']:
     if sc != '現状': t['費用'] += PROD_COST + OPS_COST
     for c in CONV:
         t[f'追加処方患者_{c}'] = H[f'{sc}_追加処方患者_{c}'].sum() if sc != '現状' else 0.0
-        t[f'追加売上_{c}'] = t[f'追加処方患者_{c}'] * SALES_PER_PT
+    # 全国換算(回答医師の結果 × 倍率)。追加売上 = 全国の追加処方患者 × 1人あたり売上 = 回答医師の追加処方患者 × 50億円 ÷ 回答医師の処方患者
+    for k in ['配信医師数', '既読件数', '費用']: t[f'全国_{k}'] = t[k] * SCALE
+    for c in CONV:
+        t[f'全国_追加処方患者_{c}'] = t[f'追加処方患者_{c}'] * SCALE
+        t[f'全国_追加売上_{c}'] = t[f'全国_追加処方患者_{c}'] * SALES_PER_PT
+        t[f'売上に対する割合_{c}'] = t[f'全国_追加売上_{c}'] / P['売上']
     tot[sc] = t
-for sc in ['A案', 'B案']: tot[sc]['追加費用'] = tot[sc]['費用'] - tot['現状']['費用']
-tot['現状']['追加費用'] = 0
+for sc in ['A案', 'B案']: tot[sc]['追加費用'] = tot[sc]['費用'] - tot['現状']['費用']; tot[sc]['全国_追加費用'] = tot[sc]['全国_費用'] - tot['現状']['全国_費用']
+tot['現状']['追加費用'] = 0; tot['現状']['全国_追加費用'] = 0
 tot['B案−A案'] = {k: tot['B案'][k] - tot['A案'][k] for k in tot['B案']}
 S = pd.DataFrame(tot); S.index.name = '項目'; S.to_csv(os.path.join(OUT, 'H3_予算シナリオ比較.csv'), encoding='utf-8-sig')
 # 既読1件あたりの効果(翌年の潜在 × 既読医師の増減 ÷ 既読件数の増減): 予算を移す理由の確認
@@ -60,5 +68,5 @@ for sc in ['A案', 'B案']:
 eff[['群', 'A案_既読の増減', 'A案_既読医師の増減', 'A案_既読1件あたり_翌年潜在×既読医師', 'B案_既読の増減', 'B案_既読1件あたり_翌年潜在×既読医師']].to_csv(os.path.join(OUT, 'H4_既読1件あたりの効果.csv'), encoding='utf-8-sig', index=False)
 pd.set_option('display.width', 250); pd.set_option('display.float_format', lambda x: f'{x:,.3f}')
 print(H[['群', '医師数', '潜在未処方', '1配信あたり既読率', '10回時の既読医師率', '翌年比', '現状回数', 'A案回数', 'B案回数', 'A案_既読件数', 'A案_既読医師の増減', 'A案_追加処方患者_基準', 'B案_追加処方患者_基準']].to_string())
-print(S.to_string()); print(eff[['群', 'A案_既読1件あたり_翌年潜在×既読医師', 'B案_既読1件あたり_翌年潜在×既読医師']].to_string()); print('1処方患者あたり年間売上', round(SALES_PER_PT, 1))
-json.dump({'sales_per_pt': SALES_PER_PT, 'conv': CONV, 'groups': G, 'totals': tot}, open(os.path.join(OUT, 'plan_v5.json'), 'w'), ensure_ascii=False, indent=1, default=float)
+print(S.to_string()); print(eff[['群', 'A案_既読1件あたり_翌年潜在×既読医師', 'B案_既読1件あたり_翌年潜在×既読医師']].to_string()); print('全国換算の倍率', SCALE, '1処方患者あたり年間売上', round(SALES_PER_PT, 1))
+json.dump({'sales_per_pt': SALES_PER_PT, 'n_market': N_MARKET, 'scale': SCALE, 'conv': CONV, 'groups': G, 'totals': tot}, open(os.path.join(OUT, 'plan_v5.json'), 'w'), ensure_ascii=False, indent=1, default=float)
